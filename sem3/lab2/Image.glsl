@@ -47,7 +47,6 @@ Surface minWithColor(Surface a, Surface b) {
     return b;
 }
 
-
 Surface sdTank(vec3 p, vec3 tankPos, vec3 color, bool isEnemy, float turretAngle, float barrelAngle) {
     Surface result = Surface(MAX_DIST, vec3(0), -1);
     
@@ -106,12 +105,26 @@ Surface sdTank(vec3 p, vec3 tankPos, vec3 color, bool isEnemy, float turretAngle
     return result;
 }
 
-
 Surface sdGround(vec3 p) {
     float ground = sdPlane(p, -1.0);
     vec3 grassColor = vec3(0.2, 0.6, 0.1);
     float pattern = sin(p.x * 5.0) * cos(p.z * 5.0) * 0.1;
     grassColor += vec3(pattern * 0.2);
+    
+    // Обработка воронок
+    const int NUM_CRATERS = 20;
+    for (int i = 0; i < NUM_CRATERS; i++) {
+        vec4 crater = texelFetch(iChannel3, ivec2(i, 0), 0);
+        if (crater.w > 0.5) { // активная воронка
+            float radius = crater.z;
+            float circleDist = length(vec2(p.x - crater.x, p.z - crater.y)) - radius;
+            if (circleDist < 0.0) {
+                ground = max(ground, circleDist);
+                grassColor = vec3(0.1, 0.1, 0.1); 
+            }
+        }
+    }
+    
     return Surface(ground, grassColor, 0);
 }
 
@@ -122,11 +135,28 @@ Surface sdShell(vec3 p, vec3 shellPos, bool shellActive) {
     return Surface(shell, vec3(1.0, 0.8, 0.0), 4);
 }
 
+Surface sdBomb(vec3 p, vec4 bomb) {
+    float bombRadius = 0.08;
+    vec3 bombPos = vec3(bomb.x, bomb.y, bomb.z);
+    float bombSd = sdSphere(p - bombPos, bombRadius);
+    return Surface(bombSd, vec3(1.0, 0.0, 0.0), 5);
+}
+
 Surface sdScene(vec3 p, float turretAngle, float barrelAngle, vec3 shellPos, bool shellActive) {
     Surface scene = sdGround(p);
     scene = minWithColor(scene, sdTank(p, vec3(-3, -0.6, 0), vec3(0.3, 0.3, 0.8), false, turretAngle, barrelAngle));
     scene = minWithColor(scene, sdTank(p, vec3(3, -0.6, 0), vec3(0.8, 0.3, 0.3), true, turretAngle, barrelAngle));
     scene = minWithColor(scene, sdShell(p, shellPos, shellActive));
+    
+    // Добавляем бомбы
+    const int NUM_BOMBS = 5;
+    for (int i = 0; i < NUM_BOMBS; i++) {
+        vec4 bomb = texelFetch(iChannel2, ivec2(i, 0), 0);
+        if (bomb.w == 1.0) { // падает
+            Surface bombSurf = sdBomb(p, bomb);
+            scene = minWithColor(scene, bombSurf);
+        }
+    }
     return scene;
 }
 
@@ -190,7 +220,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         vec3 normal = calcNormal(p, turretAngle, barrelAngle, shellPos, shellActive);
         
         vec3 lightDir = normalize(vec3(1, 2, 1));
-        float diff = max(dot(normal, lightDir), 0.2);
+        float diff = max(dot(normal, lightDir), 0.0);
         
         vec3 material = co.col;
         if (co.objType == 0) {

@@ -48,32 +48,32 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     bool shellActive = prevShellState.w > 0.5;
     vec3 shellVel = prevShellVel.xyz;
     
-    if (spacePressed) {
+    if (spacePressed && !shellActive) {
         shellActive = true;
-        
+
         vec3 tankPos = vec3(-3, -0.6, 0);
         vec3 turretOffset = vec3(0, 0.8, 0);
-        
+
         //место вылета снарядов
         vec3 barrelBaseLocal = vec3(0, -0.1, 0.5);
         float barrelLength = 1.0;
-        
+
         //направление от основания к концу
         vec3 barrelVector = vec3(0, 0, barrelLength);
-        
+
         //применяем наклон ствола
         barrelVector = rotateX(barrelAngle) * barrelVector;
-        
+
         //применяем провороты башни
         barrelBaseLocal = rotateY(turretAngle) * barrelBaseLocal;
         barrelVector = rotateY(turretAngle) * barrelVector;
-        
+
         shellPos = tankPos + turretOffset + barrelBaseLocal + barrelVector;
-        
+
         vec3 shotDirection = normalize(barrelVector);
-        
-        shellVel = shotDirection * 0.15;
-        
+
+        shellVel = shotDirection * 0.3;
+
         prevShellState = vec4(shellPos, 1.0);
         prevShellVel = vec4(shellVel, 0.0);
     }
