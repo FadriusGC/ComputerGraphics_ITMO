@@ -12,6 +12,11 @@ Model* model = NULL;
 const int width = 800;
 const int height = 800;
 
+const int depth = 255;  // константа глубины
+
+int* zbuffer = NULL;  // Целочисленный Z-буфер
+Vec3f light_dir(0, 0, -1);
+
 void line(int x0, int y0, int x1, int y1, TGAImage& image, TGAColor color) {
   bool steep = false;  // Флаг "крутизны" линии. Крутая = когда изменение по Y
                        // больше, чем по X.
@@ -58,12 +63,11 @@ void line(int x0, int y0, int x1, int y1, TGAImage& image, TGAColor color) {
   }
 }
 
-void triangle(Vec3f t0, Vec3f t1, Vec3f t2, TGAImage& image, TGAColor color,
-              float* zbuffer) {
-  // Игнорируем вырожденные треугольники
+// Ообновлегная TRIANGLE
+void triangle(Vec3i t0, Vec3i t1, Vec3i t2, TGAImage& image, TGAColor color,
+              int* zbuffer) {
   if (t0.y == t1.y && t0.y == t2.y) return;
 
-  // Сортируем вершины по Y (от самой нижней к самой верхней)
   if (t0.y > t1.y) std::swap(t0, t1);
   if (t0.y > t2.y) std::swap(t0, t2);
   if (t1.y > t2.y) std::swap(t1, t2);
@@ -77,30 +81,30 @@ void triangle(Vec3f t0, Vec3f t1, Vec3f t2, TGAImage& image, TGAColor color,
     float alpha = (float)i / total_height;
     float beta = (float)(i - (second_half ? t1.y - t0.y : 0)) / segment_height;
 
-    // Вычисляем точки A и B с учетом Z-координаты
-    Vec3f A = t0 + (t2 - t0) * alpha;
-    Vec3f B = second_half ? t1 + (t2 - t1) * beta : t0 + (t1 - t0) * beta;
+    Vec3i A = t0 + (t2 - t0) * alpha;
+    Vec3i B = second_half ? t1 + (t2 - t1) * beta : t0 + (t1 - t0) * beta;
 
     if (A.x > B.x) std::swap(A, B);
 
-    // Для каждого пикселя в горизонтальной линии
     for (int j = A.x; j <= B.x; j++) {
-      // Интерполируем Z-координату между A и B
       float phi = (B.x == A.x) ? 1.0f : (float)(j - A.x) / (float)(B.x - A.x);
-      Vec3f P = A + (B - A) * phi;
+      Vec3i P = A + (B - A) * phi;
 
-      // Вычисляем индекс в Z-буфере
-      int idx = int(P.x) + int(P.y) * width;
+      // исправление проблем с целочисленным приведением
+      P.x = j;
+      P.y = t0.y + i;
 
-      // Проверяем, находится ли текущий пиксель ближе к камере
-      if (idx < width * height && zbuffer[idx] < P.z) {
-        zbuffer[idx] = P.z;          // Обновляем Z-буфер
-        image.set(P.x, P.y, color);  // Рисуем пиксель
+      int idx = P.x + P.y * width;
+
+      if (zbuffer[idx] < P.z) {
+        zbuffer[idx] = P.z;
+        image.set(P.x, P.y, color);
       }
     }
   }
 }
 
+// СОЗДАЕМ И ИНИЦИАЛИЗИРУЕМ ZZZZZ-БУФЕР
 int main(int argc, char** argv) {
   if (2 == argc) {
     model = new Model(argv[1]);
@@ -108,27 +112,24 @@ int main(int argc, char** argv) {
     model = new Model("obj/african_head.obj");
   }
 
-  TGAImage image(width, height, TGAImage::RGB);
-
-  // СОЗДАЕМ И ИНИЦИАЛИЗИРУЕМ ZZZZZ-БУФЕР
-  float* zbuffer = new float[width * height];
+  zbuffer = new int[width * height];
   for (int i = 0; i < width * height; i++) {
-    zbuffer[i] = -std::numeric_limits<float>::max();  // Инициализируем очень
-                                                      // маленькими значениями
+    zbuffer[i] = std::numeric_limits<int>::min();
   }
 
-  Vec3f light_dir(0, 0, -1);
+  TGAImage image(width, height, TGAImage::RGB);
 
   for (int i = 0; i < model->nfaces(); i++) {
     std::vector<int> face = model->face(i);
-    Vec3f screen_coords[3];  // Теперь используем Vec3f вместо Vec2i
+    Vec3i screen_coords[3];  // Vec3i вместо Vec3f
     Vec3f world_coords[3];
 
     for (int j = 0; j < 3; j++) {
       Vec3f v = model->vert(face[j]);
-      // Сохраняем Z-координату из мировых координат
+      // важная хрень - преобразование Z-координаты
       screen_coords[j] =
-          Vec3f((v.x + 1.) * width / 2., (v.y + 1.) * height / 2., v.z);
+          Vec3i((v.x + 1.) * width / 2., (v.y + 1.) * height / 2.,
+                (v.z + 1.) * depth / 2.);
       world_coords[j] = v;
     }
 
@@ -140,7 +141,6 @@ int main(int argc, char** argv) {
     if (intensity > 0) {
       TGAColor color =
           TGAColor(intensity * 255, intensity * 255, intensity * 255, 255);
-      // Передаем zbuffer в функцию triangle
       triangle(screen_coords[0], screen_coords[1], screen_coords[2], image,
                color, zbuffer);
     }
@@ -149,7 +149,18 @@ int main(int argc, char** argv) {
   image.flip_vertically();
   image.write_tga_file("output.tga");
 
-  // ОСВОБОЖДАЕМ ПАМЯТЬ ZZZZZZZZ-БУФЕРА
+  // сохранение Z-буфера для отладки
+  {
+    TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
+    for (int i = 0; i < width; i++) {
+      for (int j = 0; j < height; j++) {
+        zbimage.set(i, j, TGAColor(zbuffer[i + j * width], 1));
+      }
+    }
+    zbimage.flip_vertically();
+    zbimage.write_tga_file("zbuffer.tga");
+  }
+
   delete[] zbuffer;
   delete model;
   return 0;
