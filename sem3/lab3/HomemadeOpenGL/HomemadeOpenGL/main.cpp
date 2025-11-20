@@ -1,4 +1,5 @@
-﻿#include <cmath>
+#include <cmath>
+#include <iostream>
 #include <limits>
 #include <vector>
 
@@ -10,15 +11,14 @@ const int width = 800;
 const int height = 800;
 const int depth = 255;
 
-Model* model = NULL;
-int* zbuffer = NULL;
+Model *model = NULL;
+int *zbuffer = NULL;
 Vec3f light_dir(0, 0, -1);
 
 void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
-              TGAImage& image, float intensity, int* zbuffer) {
-  if (t0.y == t1.y && t0.y == t2.y) return;
-
-  // Сортируем вершины и соответствующие UV-координаты
+              TGAImage &image, float intensity, int *zbuffer) {
+  if (t0.y == t1.y && t0.y == t2.y)
+    return;  // i dont care about degenerate triangles
   if (t0.y > t1.y) {
     std::swap(t0, t1);
     std::swap(uv0, uv1);
@@ -33,41 +33,29 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
   }
 
   int total_height = t2.y - t0.y;
-
   for (int i = 0; i < total_height; i++) {
     bool second_half = i > t1.y - t0.y || t1.y == t0.y;
     int segment_height = second_half ? t2.y - t1.y : t1.y - t0.y;
-
     float alpha = (float)i / total_height;
-    float beta = (float)(i - (second_half ? t1.y - t0.y : 0)) / segment_height;
-
-    // Интерполяция координат
-    Vec3i A = t0 + (t2 - t0) * alpha;
-    Vec3i B = second_half ? t1 + (t2 - t1) * beta : t0 + (t1 - t0) * beta;
-
-    // Интерполяция UV-координат
+    float beta = (float)(i - (second_half ? t1.y - t0.y : 0)) /
+                 segment_height;  // be careful: with above conditions no
+                                  // division by zero here
+    Vec3i A = t0 + Vec3f(t2 - t0) * alpha;
+    Vec3i B =
+        second_half ? t1 + Vec3f(t2 - t1) * beta : t0 + Vec3f(t1 - t0) * beta;
     Vec2i uvA = uv0 + (uv2 - uv0) * alpha;
     Vec2i uvB =
         second_half ? uv1 + (uv2 - uv1) * beta : uv0 + (uv1 - uv0) * beta;
-
     if (A.x > B.x) {
       std::swap(A, B);
       std::swap(uvA, uvB);
     }
-
     for (int j = A.x; j <= B.x; j++) {
-      float phi = (B.x == A.x) ? 1.0f : (float)(j - A.x) / (float)(B.x - A.x);
-
+      float phi = B.x == A.x ? 1. : (float)(j - A.x) / (float)(B.x - A.x);
       Vec3i P = Vec3f(A) + Vec3f(B - A) * phi;
       Vec2i uvP = uvA + (uvB - uvA) * phi;
-
-      // Исправление координат
-      P.x = j;
-      P.y = t0.y + i;
-
       int idx = P.x + P.y * width;
-
-      if (idx < width * height && zbuffer[idx] < P.z) {
+      if (zbuffer[idx] < P.z) {
         zbuffer[idx] = P.z;
         TGAColor color = model->diffuse(uvP);
         image.set(P.x, P.y,
@@ -78,7 +66,7 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
   }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   if (2 == argc) {
     model = new Model(argv[1]);
   } else {
@@ -90,13 +78,12 @@ int main(int argc, char** argv) {
     zbuffer[i] = std::numeric_limits<int>::min();
   }
 
-  {  // Отрисовка модели
+  {  // draw the model
     TGAImage image(width, height, TGAImage::RGB);
     for (int i = 0; i < model->nfaces(); i++) {
       std::vector<int> face = model->face(i);
       Vec3i screen_coords[3];
       Vec3f world_coords[3];
-
       for (int j = 0; j < 3; j++) {
         Vec3f v = model->vert(face[j]);
         screen_coords[j] =
@@ -104,12 +91,10 @@ int main(int argc, char** argv) {
                   (v.z + 1.) * depth / 2.);
         world_coords[j] = v;
       }
-
       Vec3f n = (world_coords[2] - world_coords[0]) ^
                 (world_coords[1] - world_coords[0]);
       n.normalize();
       float intensity = n * light_dir;
-
       if (intensity > 0) {
         Vec2i uv[3];
         for (int k = 0; k < 3; k++) {
@@ -120,21 +105,22 @@ int main(int argc, char** argv) {
       }
     }
 
-    image.flip_vertically();
+    image.flip_vertically();  // i want to have the origin at the left bottom
+                              // corner of the image
     image.write_tga_file("output.tga");
   }
 
-  {  // Сохранение Z-буфера для отладки
+  {  // dump z-buffer (debugging purposes only)
     TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
     for (int i = 0; i < width; i++) {
       for (int j = 0; j < height; j++) {
         zbimage.set(i, j, TGAColor(zbuffer[i + j * width], 1));
       }
     }
-    zbimage.flip_vertically();
+    zbimage.flip_vertically();  // i want to have the origin at the left bottom
+                                // corner of the image
     zbimage.write_tga_file("zbuffer.tga");
   }
-
   delete model;
   delete[] zbuffer;
   return 0;
