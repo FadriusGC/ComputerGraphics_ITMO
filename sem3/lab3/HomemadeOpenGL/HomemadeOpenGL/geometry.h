@@ -82,4 +82,7 @@ std::ostream& operator<<(std::ostream& s, Vec3<t>& v) {
   return s;
 }
 
+typedef Vec3<float> Vec3f;
+typedef Vec3<int> Vec3i;
+
 #endif  //__GEOMETRY_H__
