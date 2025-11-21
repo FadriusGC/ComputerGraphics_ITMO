@@ -14,10 +14,10 @@ class Model {
   std::vector<Vec3f> norms_;
   std::vector<Vec2f> uv_;
   TGAImage diffusemap_;
-  void load_texture(std::string filename, const char *suffix, TGAImage &img);
+  void load_texture(std::string filename, const char* suffix, TGAImage& img);
 
  public:
-  Model(const char *filename);
+  Model(const char* filename);
   ~Model();
   int nverts();
   int nfaces();
@@ -25,6 +25,9 @@ class Model {
   Vec2i uv(int iface, int nvert);
   TGAColor diffuse(Vec2i uv);
   std::vector<int> face(int idx);
+
+  // Добавляем метод для доступа к нормалям
+  Vec3f norm(int iface, int nvert);
 };
 
 #endif  //__MODEL_H__

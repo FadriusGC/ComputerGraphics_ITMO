@@ -15,7 +15,7 @@ const int depth = 255;
 
 Model* model = NULL;
 int* zbuffer = NULL;
-Vec3f light_dir(0, 0, -1);
+Vec3f light_dir = Vec3f(1, -1, 1).normalize();  // Как в статье
 
 Vec3f m2v(Matrix m) {
   return Vec3f(m[0][0] / m[3][0], m[1][0] / m[3][0], m[2][0] / m[3][0]);
@@ -41,6 +41,7 @@ Matrix viewport(int x, int y, int w, int h) {
   return m;
 }
 
+// Упрощенная функция треугольника как в статье
 void triangle(Vec3i t0, Vec3i t1, Vec3i t2, float ity0, float ity1, float ity2,
               TGAImage& image, int* zbuffer) {
   if (t0.y == t1.y && t0.y == t2.y) return;
@@ -81,7 +82,10 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, float ity0, float ity1, float ity2,
       if (P.x >= width || P.y >= height || P.x < 0 || P.y < 0) continue;
       if (zbuffer[idx] < P.z) {
         zbuffer[idx] = P.z;
-        image.set(P.x, P.y, TGAColor(255, 255, 255) * ityP);
+        // Исправляем создание цвета - используем конструктор с тремя
+        // параметрами
+        TGAColor color = TGAColor(255, 255, 255) * ityP;
+        image.set(P.x, P.y, color);
       }
     }
   }
@@ -109,7 +113,7 @@ int main(int argc, char** argv) {
     zbuffer[i] = std::numeric_limits<int>::min();
   }
 
-  {
+  {  // draw the model
     Vec3f eye(0, 0, 3);
     Vec3f center(0, 0, 0);
     Vec3f up(0, 1, 0);
@@ -127,21 +131,23 @@ int main(int argc, char** argv) {
     for (int i = 0; i < model->nfaces(); i++) {
       std::vector<int> face = model->face(i);
       Vec3i screen_coords[3];
-      Vec3f world_coords[3];
       float intensity[3];
 
       for (int j = 0; j < 3; j++) {
         Vec3f v = model->vert(face[j]);
-        // преобразование: ViewPort * Projection * View * вершина
         screen_coords[j] = m2v(ViewPort * Projection * View * v2m(v));
-        world_coords[j] = v;
 
-        Vec3f n = (world_coords[2] - world_coords[0]) ^
-                  (world_coords[1] - world_coords[0]);
-        n.normalize();
+        // Используем новый метод norm из модели
+        Vec3f n = model->norm(i, j);
         intensity[j] = n * light_dir;
         if (intensity[j] < 0) intensity[j] = 0;
         if (intensity[j] > 1) intensity[j] = 1;
+      }
+
+      // Отладочная информация для первых треугольников
+      if (i < 5) {
+        std::cout << "Triangle " << i << " intensities: " << intensity[0]
+                  << ", " << intensity[1] << ", " << intensity[2] << std::endl;
       }
 
       triangle(screen_coords[0], screen_coords[1], screen_coords[2],
@@ -153,7 +159,7 @@ int main(int argc, char** argv) {
     std::cout << "Saved output.tga" << std::endl;
   }
 
-  {
+  {  // dump z-buffer
     TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
     for (int i = 0; i < width; i++) {
       for (int j = 0; j < height; j++) {
