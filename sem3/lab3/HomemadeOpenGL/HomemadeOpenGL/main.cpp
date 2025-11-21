@@ -1,6 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include "camera.h"
@@ -16,32 +17,24 @@ Model* model = NULL;
 int* zbuffer = NULL;
 Vec3f light_dir(0, 0, -1);
 
-// Преобразование из матрицы обратно в вектор
-// Деление на w-компоненту для перспективной коррекции
 Vec3f m2v(Matrix m) {
   return Vec3f(m[0][0] / m[3][0], m[1][0] / m[3][0], m[2][0] / m[3][0]);
 }
 
-// Преобразование вектора в матрицу
-// Добавляем w=1 для точек, w=0 для векторов
 Matrix v2m(Vec3f v) {
   Matrix m(4, 1);
   m[0][0] = v.x;
   m[1][0] = v.y;
   m[2][0] = v.z;
-  m[3][0] = 1.f;  // w-компонента = 1 для точек
+  m[3][0] = 1.f;
   return m;
 }
 
-// Создание матрицы вьюпорта
 Matrix viewport(int x, int y, int w, int h) {
   Matrix m = Matrix::identity(4);
-  // Сдвиг: из центра (0,0,0) в центр вьюпорта
   m[0][3] = x + w / 2.f;
   m[1][3] = y + h / 2.f;
   m[2][3] = depth / 2.f;
-
-  // Масштабирование: из [-1,1] в [0, width/height]
   m[0][0] = w / 2.f;
   m[1][1] = h / 2.f;
   m[2][2] = depth / 2.f;
@@ -52,7 +45,6 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
               TGAImage& image, float intensity, int* zbuffer) {
   if (t0.y == t1.y && t0.y == t2.y) return;
 
-  // Сортировка вершин по Y и соответствующих UV-координат
   if (t0.y > t1.y) {
     std::swap(t0, t1);
     std::swap(uv0, uv1);
@@ -68,14 +60,12 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
 
   int total_height = t2.y - t0.y;
 
-  // Растеризация треугольника по строчным линиям
   for (int i = 0; i < total_height; i++) {
     bool second_half = i > t1.y - t0.y || t1.y == t0.y;
     int segment_height = second_half ? t2.y - t1.y : t1.y - t0.y;
     float alpha = (float)i / total_height;
     float beta = (float)(i - (second_half ? t1.y - t0.y : 0)) / segment_height;
 
-    // Интерполяция координат и UV
     Vec3i A = t0 + Vec3f(t2 - t0) * alpha;
     Vec3i B =
         second_half ? t1 + Vec3f(t2 - t1) * beta : t0 + Vec3f(t1 - t0) * beta;
@@ -88,14 +78,13 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
       std::swap(uvA, uvB);
     }
 
-    // Отрисовка горизонтальной линии
     for (int j = A.x; j <= B.x; j++) {
       float phi = B.x == A.x ? 1. : (float)(j - A.x) / (float)(B.x - A.x);
       Vec3i P = Vec3f(A) + Vec3f(B - A) * phi;
       Vec2i uvP = uvA + (uvB - uvA) * phi;
 
       int idx = P.x + P.y * width;
-      if (zbuffer[idx] < P.z) {
+      if (idx >= 0 && idx < width * height && zbuffer[idx] < P.z) {
         zbuffer[idx] = P.z;
         TGAColor color = model->diffuse(uvP);
         image.set(P.x, P.y,
@@ -106,7 +95,9 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
   }
 }
 
-void renderScene(const char* output_filename, Camera& camera) {
+void renderScene(const std::string& output_filename, Camera& camera) {
+  std::cout << "Rendering: " << output_filename << std::endl;
+
   zbuffer = new int[width * height];
   for (int i = 0; i < width * height; i++) {
     zbuffer[i] = std::numeric_limits<int>::min();
@@ -115,11 +106,14 @@ void renderScene(const char* output_filename, Camera& camera) {
   Matrix ViewPort =
       viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
 
-  // Получаем матрицы из камеры
   Matrix View = camera.getViewMatrix();
   Matrix Projection = camera.getProjectionMatrix();
 
+  std::cout << "View matrix created" << std::endl;
+  std::cout << "Projection matrix created" << std::endl;
+
   TGAImage image(width, height, TGAImage::RGB);
+  std::cout << "TGAImage created: " << width << "x" << height << std::endl;
 
   for (int i = 0; i < model->nfaces(); i++) {
     std::vector<int> face = model->face(i);
@@ -129,8 +123,7 @@ void renderScene(const char* output_filename, Camera& camera) {
     for (int j = 0; j < 3; j++) {
       Vec3f v = model->vert(face[j]);
 
-      // Применяем все преобразования: Model -> View -> Projection -> Viewport
-      screen_coords[j] = m2v(ViewPort * Projection * View * v2m(v));
+      screen_coords[j] = m2v(ViewPort * Projection * v2m(v));
       world_coords[j] = v;
     }
 
@@ -139,6 +132,7 @@ void renderScene(const char* output_filename, Camera& camera) {
     n.normalize();
     float intensity = n * light_dir;
 
+    // Back-face culling
     if (intensity > 0) {
       Vec2i uv[3];
       for (int k = 0; k < 3; k++) {
@@ -150,47 +144,52 @@ void renderScene(const char* output_filename, Camera& camera) {
   }
 
   image.flip_vertically();
-  image.write_tga_file(output_filename);
+  image.write_tga_file("output_front.tga");
 
-  // Сохраняем z-buffer для отладки
+  // Z-buffer image
   TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
   for (int i = 0; i < width; i++) {
     for (int j = 0; j < height; j++) {
-      zbimage.set(i, j, TGAColor(zbuffer[i + j * width], 1));
+      int zval = zbuffer[i + j * width];
+      if (zval > std::numeric_limits<int>::min()) {
+        zbimage.set(i, j, TGAColor(zval, 1));
+      }
     }
   }
   zbimage.flip_vertically();
-  zbimage.write_tga_file("zbuffer.tga");
+  zbimage.write_tga_file("zbuffer2.tga");
 
   delete[] zbuffer;
+  return;
 }
 
 int main(int argc, char** argv) {
-  if (2 == argc) {
-    model = new Model(argv[1]);
-  } else {
-    model = new Model("obj/african_head.obj");
+  std::cout << "Starting renderer..." << std::endl;
+
+  // Load model
+  const char* model_path = "obj/african_head.obj";
+  if (argc >= 2) {
+    model_path = argv[1];
   }
 
+  std::cout << "Loading model: " << model_path << std::endl;
+  model = new Model(model_path);
+
+  if (model->nverts() == 0) {
+    std::cout << "ERROR: Failed to load model!" << std::endl;
+    return 1;
+  }
+
+  std::cout << "Model loaded: " << model->nverts() << " vertices, "
+            << model->nfaces() << " faces" << std::endl;
+
   float aspect = (float)width / (float)height;
-  std::cout << "sosal";
-  // Пример 1: Камера спереди
+
+  std::cout << "\n=== Camera 1: Front view ===" << std::endl;
   Camera camera1(Vec3f(0, 0, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0), 45.0f, aspect);
   renderScene("output_front.tga", camera1);
 
-  // Пример 2: Камера сверху
-  Camera camera2(Vec3f(0, 2, 0), Vec3f(0, 0, 0), Vec3f(0, 0, -1), 45.0f,
-                 aspect);
-  renderScene("output_top.tga", camera2);
-
-  // Пример 3: Камера сбоку
-  Camera camera3(Vec3f(2, 1, 1), Vec3f(0, 0, 0), Vec3f(0, 1, 0), 45.0f, aspect);
-  renderScene("output_side.tga", camera3);
-
-  // Пример 4: Камера с близкого расстояния
-  Camera camera4(Vec3f(0, 0, 1), Vec3f(0, 0, 0), Vec3f(0, 1, 0), 60.0f, aspect);
-  renderScene("output_close.tga", camera4);
-
   delete model;
+  std::cout << "Done!" << std::endl;
   return 0;
 }

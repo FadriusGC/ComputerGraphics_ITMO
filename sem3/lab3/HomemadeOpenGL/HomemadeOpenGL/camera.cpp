@@ -1,6 +1,7 @@
 #include "camera.h"
 
 #include <cmath>
+#include <iostream>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -65,6 +66,9 @@ Matrix Camera::getViewMatrix() {
 }
 
 Matrix Camera::getProjectionMatrix() {
+  std::cout << "Creating projection matrix: fov=" << fov_
+            << ", aspect=" << aspect_ << ", near=" << near_ << ", far=" << far_
+            << std::endl;
   float tanHalfFov = tan(fov_ * M_PI / 360.0f);  // fov/2 в радианах
   float range = near_ - far_;
 
