@@ -44,11 +44,17 @@ struct Vec3 {
   Vec3<t> operator*(float f) const { return Vec3<t>(x * f, y * f, z * f); }
   t operator*(const Vec3<t>& v) const { return x * v.x + y * v.y + z * v.z; }
   float norm() const { return std::sqrt(x * x + y * y + z * z); }
-  Vec3<t>& normalize(t l = 1) {
-    *this = (*this) * (l / norm());
+  Vec3<t> normalize(t l = 1) const {
+    float n = norm();
+    if (n > 0) {
+      return Vec3<t>(x * l / n, y * l / n, z * l / n);
+    }
     return *this;
   }
   t& operator[](const int i) { return i <= 0 ? x : (1 == i ? y : z); }
+  const t& operator[](const int i) const {
+    return i <= 0 ? x : (1 == i ? y : z);
+  }
   template <class>
   friend std::ostream& operator<<(std::ostream& s, Vec3<t>& v);
 };
@@ -57,13 +63,6 @@ typedef Vec2<float> Vec2f;
 typedef Vec2<int> Vec2i;
 typedef Vec3<float> Vec3f;
 typedef Vec3<int> Vec3i;
-
-template <>
-template <>
-Vec3<int>::Vec3(const Vec3<float>& v);
-template <>
-template <>
-Vec3<float>::Vec3(const Vec3<int>& v);
 
 template <class t>
 std::ostream& operator<<(std::ostream& s, Vec2<t>& v) {
@@ -88,9 +87,8 @@ class Matrix {
   int ncols();
   static Matrix identity(int dimensions);
   std::vector<float>& operator[](const int i);
-  const std::vector<float>& operator[](
-      const int i) const;                   // Добавляем константную версию
-  Matrix operator*(const Matrix& a) const;  // Делаем константным
+  const std::vector<float>& operator[](const int i) const;
+  Matrix operator*(const Matrix& a) const;
   Matrix transpose();
   Matrix inverse();
   friend std::ostream& operator<<(std::ostream& s, Matrix& m);

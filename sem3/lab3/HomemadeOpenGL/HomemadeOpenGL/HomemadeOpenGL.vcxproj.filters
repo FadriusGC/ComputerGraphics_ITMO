@@ -27,10 +27,13 @@
     <ClCompile Include="geometry.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="our_gl.cpp">
+    <ClCompile Include="camera.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="camera.cpp">
+    <ClCompile Include="shader.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="rasterizer.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
@@ -44,10 +47,13 @@
     <ClInclude Include="geometry.h">
       <Filter>Файлы ресурсов\Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="our_gl.h">
+    <ClInclude Include="camera.h">
       <Filter>Файлы ресурсов\Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="camera.h">
+    <ClInclude Include="shader.h">
+      <Filter>Файлы ресурсов\Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="rasterizer.h">
       <Filter>Файлы ресурсов\Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
