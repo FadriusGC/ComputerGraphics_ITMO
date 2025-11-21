@@ -1,5 +1,7 @@
 #include "camera.h"
 
+#include <iostream>
+
 #include "our_gl.h"
 
 Camera::Camera(const Vec3f& eye, const Vec3f& center, const Vec3f& up)

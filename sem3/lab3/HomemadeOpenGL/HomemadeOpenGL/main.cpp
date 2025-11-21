@@ -4,7 +4,7 @@
 #include <limits>
 #include <vector>
 
-#include "camera.h"  // Подключаем новый заголовочный файл камеры
+#include "camera.h"
 #include "geometry.h"
 #include "model.h"
 #include "our_gl.h"
@@ -37,12 +37,10 @@ int main(int argc, char** argv) {
     model = new Model("obj/african_head.obj");
   }
 
-  // СОЗДАНИЕ И НАСТРОЙКА КАМЕРЫ ЧЕРЕЗ НОВЫЙ КЛАСС
+  // создаем и настраиваем камеру
   Camera camera;
-
   // Настраиваем параметры камеры
   camera.lookAt(Vec3f(1, 1, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
-
   // Обновляем матрицы с нужными параметрами
   camera.updateViewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
   camera.updateProjection(-1.0f / camera.getFocalLength());
@@ -58,8 +56,8 @@ int main(int argc, char** argv) {
     for (int j = 0; j < 3; j++) {
       Vec3f v = model->vert(face[j]);
 
-      // Используем матрицы из камеры вместо глобальных переменных
-      // Порядок умножения: Viewport * Projection * ModelView * Vertex
+      // Используем матрицы из камеры
+      // Теперь оператор умножения должен работать корректно
       screen_coords[j] = Vec3f(camera.getViewport() * camera.getProjection() *
                                camera.getModelView() * Matrix(v));
 

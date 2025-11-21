@@ -77,8 +77,6 @@ std::ostream& operator<<(std::ostream& s, Vec3<t>& v) {
   return s;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////
-
 class Matrix {
   std::vector<std::vector<float> > m;
   int rows, cols;
@@ -90,7 +88,9 @@ class Matrix {
   int ncols();
   static Matrix identity(int dimensions);
   std::vector<float>& operator[](const int i);
-  Matrix operator*(const Matrix& a);
+  const std::vector<float>& operator[](
+      const int i) const;                   // Добавляем константную версию
+  Matrix operator*(const Matrix& a) const;  // Делаем константным
   Matrix transpose();
   Matrix inverse();
   friend std::ostream& operator<<(std::ostream& s, Matrix& m);
