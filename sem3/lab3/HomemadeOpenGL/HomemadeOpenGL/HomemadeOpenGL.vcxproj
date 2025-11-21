@@ -135,6 +135,7 @@
     <ClCompile Include="model.cpp" />
     <ClCompile Include="phong_shader.cpp" />
     <ClCompile Include="rasterizer.cpp" />
+    <ClCompile Include="renderer_ui.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="tgaimage.cpp" />
   </ItemGroup>
@@ -145,6 +146,7 @@
     <ClInclude Include="model.h" />
     <ClInclude Include="phong_shader.h" />
     <ClInclude Include="rasterizer.h" />
+    <ClInclude Include="renderer_ui.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="tgaimage.h" />
   </ItemGroup>

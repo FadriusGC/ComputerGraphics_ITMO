@@ -23,10 +23,10 @@ bool PhongShader::fragment(Vec3f bar, TGAColor& color) {
   Vec2i uv =
       varying_uv_[0] * bar.x + varying_uv_[1] * bar.y + varying_uv_[2] * bar.z;
 
-  // Диффузная компонента (как в Ламберте)
+  // Диффузная компонента
   float diff = std::max(normal * light_dir_, 0.0f);
 
-  // Зеркальная компонента (Phong)
+  // Зеркальная компонента
   Vec3f reflect_dir =
       (normal * (normal * light_dir_) * 2.0f - light_dir_).normalize();
   float spec = pow(std::max(view_dir_ * reflect_dir, 0.0f), shininess_);

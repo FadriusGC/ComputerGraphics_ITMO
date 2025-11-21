@@ -42,6 +42,9 @@
     <ClCompile Include="gouraud_shader.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="renderer_ui.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tgaimage.h">
@@ -66,6 +69,9 @@
       <Filter>Файлы ресурсов\Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="gouraud_shader.h">
+      <Filter>Файлы ресурсов\Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="renderer_ui.h">
       <Filter>Файлы ресурсов\Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

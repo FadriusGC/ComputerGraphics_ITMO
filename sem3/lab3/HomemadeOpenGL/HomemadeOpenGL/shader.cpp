@@ -23,7 +23,7 @@ bool DiffuseShader::fragment(Vec3f bar, TGAColor& color) {
       static_cast<unsigned char>(diffuse_color.bgra[1] * intensity);
   unsigned char b =
       static_cast<unsigned char>(diffuse_color.bgra[0] * intensity);
-  unsigned char a = diffuse_color.bgra[3];  // Альфа-канал не изменяем
+  unsigned char a = diffuse_color.bgra[3];  // Альфу не трогаю
 
   color = TGAColor(r, g, b, a);
   return false;
