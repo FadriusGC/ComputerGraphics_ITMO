@@ -3,6 +3,7 @@
 #include <limits>
 #include <vector>
 
+#include "camera.h"
 #include "geometry.h"
 #include "model.h"
 #include "tgaimage.h"
@@ -14,7 +15,6 @@ const int depth = 255;
 Model* model = NULL;
 int* zbuffer = NULL;
 Vec3f light_dir(0, 0, -1);
-Vec3f camera(0, 0, 3);  // Положение камеры в мировом пространстве
 
 // Преобразование из матрицы обратно в вектор
 // Деление на w-компоненту для перспективной коррекции
@@ -106,6 +106,65 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
   }
 }
 
+void renderScene(const char* output_filename, Camera& camera) {
+  zbuffer = new int[width * height];
+  for (int i = 0; i < width * height; i++) {
+    zbuffer[i] = std::numeric_limits<int>::min();
+  }
+
+  Matrix ViewPort =
+      viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
+
+  // Получаем матрицы из камеры
+  Matrix View = camera.getViewMatrix();
+  Matrix Projection = camera.getProjectionMatrix();
+
+  TGAImage image(width, height, TGAImage::RGB);
+
+  for (int i = 0; i < model->nfaces(); i++) {
+    std::vector<int> face = model->face(i);
+    Vec3i screen_coords[3];
+    Vec3f world_coords[3];
+
+    for (int j = 0; j < 3; j++) {
+      Vec3f v = model->vert(face[j]);
+
+      // Применяем все преобразования: Model -> View -> Projection -> Viewport
+      screen_coords[j] = m2v(ViewPort * Projection * View * v2m(v));
+      world_coords[j] = v;
+    }
+
+    Vec3f n = (world_coords[2] - world_coords[0]) ^
+              (world_coords[1] - world_coords[0]);
+    n.normalize();
+    float intensity = n * light_dir;
+
+    if (intensity > 0) {
+      Vec2i uv[3];
+      for (int k = 0; k < 3; k++) {
+        uv[k] = model->uv(i, k);
+      }
+      triangle(screen_coords[0], screen_coords[1], screen_coords[2], uv[0],
+               uv[1], uv[2], image, intensity, zbuffer);
+    }
+  }
+
+  image.flip_vertically();
+  image.write_tga_file(output_filename);
+
+  // Сохраняем z-buffer для отладки
+  TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
+  for (int i = 0; i < width; i++) {
+    for (int j = 0; j < height; j++) {
+      zbimage.set(i, j, TGAColor(zbuffer[i + j * width], 1));
+    }
+  }
+  zbimage.flip_vertically();
+  zbimage.write_tga_file("zbuffer.tga");
+
+  delete[] zbuffer;
+}
+
 int main(int argc, char** argv) {
   if (2 == argc) {
     model = new Model(argv[1]);
@@ -113,71 +172,25 @@ int main(int argc, char** argv) {
     model = new Model("obj/african_head.obj");
   }
 
-  zbuffer = new int[width * height];
-  for (int i = 0; i < width * height; i++) {
-    zbuffer[i] = std::numeric_limits<int>::min();
-  }
+  float aspect = (float)width / (float)height;
+  std::cout << "sosal";
+  // Пример 1: Камера спереди
+  Camera camera1(Vec3f(0, 0, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0), 45.0f, aspect);
+  renderScene("output_front.tga", camera1);
 
-  {  // Блок отрисовки модели
-    // Матрица проекции: ортогональная проекция с перспективным искажением
-    Matrix Projection = Matrix::identity(4);
-    // Устанавливаем перспективное искажение (камера на расстоянии 3 по Z)
-    Projection[3][2] = -1.f / camera.z;
+  // Пример 2: Камера сверху
+  Camera camera2(Vec3f(0, 2, 0), Vec3f(0, 0, 0), Vec3f(0, 0, -1), 45.0f,
+                 aspect);
+  renderScene("output_top.tga", camera2);
 
-    // Матрица вьюпорта по сути преобразование в экранные координаты
-    Matrix ViewPort =
-        viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
+  // Пример 3: Камера сбоку
+  Camera camera3(Vec3f(2, 1, 1), Vec3f(0, 0, 0), Vec3f(0, 1, 0), 45.0f, aspect);
+  renderScene("output_side.tga", camera3);
 
-    TGAImage image(width, height, TGAImage::RGB);
-
-    // Проходимся по всемъ граням модели
-    for (int i = 0; i < model->nfaces(); i++) {
-      std::vector<int> face = model->face(i);
-      Vec3i screen_coords[3];  // Экранные координаты вершин
-      Vec3f world_coords[3];   // Мировые координаты вершин
-
-      // Полная цепочка преобразований: вершина -> однородные координаты ->
-      // проекция -> вьюпорт
-      for (int j = 0; j < 3; j++) {
-        Vec3f v = model->vert(face[j]);
-
-        screen_coords[j] = m2v(ViewPort * Projection * v2m(v));
-        world_coords[j] = v;
-      }
-
-      // Вычисление нормали треугольника
-      Vec3f n = (world_coords[2] - world_coords[0]) ^
-                (world_coords[1] - world_coords[0]);
-      n.normalize();
-      float intensity = n * light_dir;
-
-      // Back-face culling
-      if (intensity > 0) {
-        Vec2i uv[3];
-        for (int k = 0; k < 3; k++) {
-          uv[k] = model->uv(i, k);
-        }
-        triangle(screen_coords[0], screen_coords[1], screen_coords[2], uv[0],
-                 uv[1], uv[2], image, intensity, zbuffer);
-      }
-    }
-
-    image.flip_vertically();
-    image.write_tga_file("output.tga");
-  }
-
-  {
-    TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
-    for (int i = 0; i < width; i++) {
-      for (int j = 0; j < height; j++) {
-        zbimage.set(i, j, TGAColor(zbuffer[i + j * width], 1));
-      }
-    }
-    zbimage.flip_vertically();
-    zbimage.write_tga_file("zbuffer.tga");
-  }
+  // Пример 4: Камера с близкого расстояния
+  Camera camera4(Vec3f(0, 0, 1), Vec3f(0, 0, 0), Vec3f(0, 1, 0), 60.0f, aspect);
+  renderScene("output_close.tga", camera4);
 
   delete model;
-  delete[] zbuffer;
   return 0;
 }
