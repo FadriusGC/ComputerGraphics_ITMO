@@ -6,6 +6,7 @@
 
 #include "geometry.h"
 #include "tgaimage.h"
+
 class Model {
  private:
   std::vector<Vec3f> verts_;
@@ -14,6 +15,7 @@ class Model {
   std::vector<Vec3f> norms_;
   std::vector<Vec2f> uv_;
   TGAImage diffusemap_;
+  TGAImage normalmap_;
   void load_texture(std::string filename, const char* suffix, TGAImage& img);
 
  public:
@@ -21,13 +23,12 @@ class Model {
   ~Model();
   int nverts();
   int nfaces();
+  Vec3f norm(int iface, int nvert);
+  Vec3f norm(Vec2i uv);
   Vec3f vert(int i);
   Vec2i uv(int iface, int nvert);
   TGAColor diffuse(Vec2i uv);
   std::vector<int> face(int idx);
-
-  // Добавляем метод для доступа к нормалям
-  Vec3f norm(int iface, int nvert);
 };
 
 #endif  //__MODEL_H__

@@ -27,7 +27,7 @@
     <ClCompile Include="geometry.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="camera.cpp">
+    <ClCompile Include="our_gl.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
@@ -41,7 +41,7 @@
     <ClInclude Include="geometry.h">
       <Filter>Файлы ресурсов\Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="camera.h">
+    <ClInclude Include="our_gl.h">
       <Filter>Файлы ресурсов\Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,7 +2,7 @@
 #define __IMAGE_H__
 
 #include <fstream>
-
+#include <iostream>
 #pragma pack(push, 1)
 struct TGA_Header {
   char idlength;
@@ -50,6 +50,8 @@ struct TGAColor {
       bgra[i] = 0;
     }
   }
+
+  unsigned char& operator[](const int i) { return bgra[i]; }
 
   TGAColor operator*(float intensity) const {
     TGAColor res = *this;

@@ -1,178 +1,128 @@
-#include <cmath>
+﻿#include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
-#include <string>
 #include <vector>
 
-#include "camera.h"
 #include "geometry.h"
 #include "model.h"
+#include "our_gl.h"
 #include "tgaimage.h"
 
 const int width = 800;
 const int height = 800;
-const int depth = 255;
-
 Model* model = NULL;
-int* zbuffer = NULL;
-Vec3f light_dir = Vec3f(1, -1, 1).normalize();  // ��� � ������
 
-Vec3f m2v(Matrix m) {
-  return Vec3f(m[0][0] / m[3][0], m[1][0] / m[3][0], m[2][0] / m[3][0]);
-}
+TGAImage zbuffer(width, height, TGAImage::GRAYSCALE);
 
-Matrix v2m(Vec3f v) {
-  Matrix m(4, 1);
-  m[0][0] = v.x;
-  m[1][0] = v.y;
-  m[2][0] = v.z;
-  m[3][0] = 1.f;
-  return m;
-}
+Vec3f light_dir = Vec3f(1, 1, 1).normalize();
 
-Matrix viewport(int x, int y, int w, int h) {
-  Matrix m = Matrix::identity(4);
-  m[0][3] = x + w / 2.f;
-  m[1][3] = y + h / 2.f;
-  m[2][3] = depth / 2.f;
-  m[0][0] = w / 2.f;
-  m[1][1] = h / 2.f;
-  m[2][2] = depth / 2.f;
-  return m;
-}
+Vec3f eye(1, 1, 3);
+Vec3f center(0, 0, 0);
 
-// ���������� ������� ������������ ��� � ������
-void triangle(Vec3i t0, Vec3i t1, Vec3i t2, float ity0, float ity1, float ity2,
-              TGAImage& image, int* zbuffer) {
-  if (t0.y == t1.y && t0.y == t2.y) return;
-  if (t0.y > t1.y) {
-    std::swap(t0, t1);
-    std::swap(ity0, ity1);
+struct Shader : public IShader {
+  virtual ~Shader() {}
+
+  Vec2i varying_uv[3];
+  float varying_inty[3];
+
+  // Фрагментный шейдер - вызывается для каждого пикселя внутри треугольника
+  // bar - баррицентрические координаты текущего пикселя
+  // color - выходной цвет пикселя (результат работы шейдера)
+  virtual bool fragment(Vec3f bar, TGAColor& color) {
+    // Интерполяция текстурных координат через баррицентрические координаты,
+    // каждая компонента bar (x, y, z) представляет вес соответствующей вершины.
+    // В конечном итоге получаем текстурные координаты для текущего пикселя
+
+    Vec2i uv =
+        varying_uv[0] * bar.x + varying_uv[1] * bar.y + varying_uv[2] * bar.z;
+
+    // Расчет освещения по модели Ламберта
+    // model->norm(uv) получает нормаль из карты нормалей в текселе uv
+    // light_dir - направление на источник света
+    // Скалярное произведение дает косинус угла между нормалью и светом
+    float inty = model->norm(uv) * light_dir;
+
+    color = model->diffuse(uv) * inty;
+
+    return false;
   }
-  if (t0.y > t2.y) {
-    std::swap(t0, t2);
-    std::swap(ity0, ity2);
-  }
-  if (t1.y > t2.y) {
-    std::swap(t1, t2);
-    std::swap(ity1, ity2);
-  }
-
-  int total_height = t2.y - t0.y;
-  for (int i = 0; i < total_height; i++) {
-    bool second_half = i > t1.y - t0.y || t1.y == t0.y;
-    int segment_height = second_half ? t2.y - t1.y : t1.y - t0.y;
-    float alpha = (float)i / total_height;
-    float beta = (float)(i - (second_half ? t1.y - t0.y : 0)) / segment_height;
-    Vec3i A = t0 + Vec3f(t2 - t0) * alpha;
-    Vec3i B =
-        second_half ? t1 + Vec3f(t2 - t1) * beta : t0 + Vec3f(t1 - t0) * beta;
-    float ityA = ity0 + (ity2 - ity0) * alpha;
-    float ityB =
-        second_half ? ity1 + (ity2 - ity1) * beta : ity0 + (ity1 - ity0) * beta;
-    if (A.x > B.x) {
-      std::swap(A, B);
-      std::swap(ityA, ityB);
-    }
-    for (int j = A.x; j <= B.x; j++) {
-      float phi = B.x == A.x ? 1. : (float)(j - A.x) / (float)(B.x - A.x);
-      Vec3i P = Vec3f(A) + Vec3f(B - A) * phi;
-      float ityP = ityA + (ityB - ityA) * phi;
-      int idx = P.x + P.y * width;
-      if (P.x >= width || P.y >= height || P.x < 0 || P.y < 0) continue;
-      if (zbuffer[idx] < P.z) {
-        zbuffer[idx] = P.z;
-        // ���������� �������� ����� - ���������� ����������� � �����
-        // �����������
-        TGAColor color = TGAColor(255, 255, 255) * ityP;
-        image.set(P.x, P.y, color);
-      }
-    }
-  }
-}
+};
 
 int main(int argc, char** argv) {
-  std::cout << "Starting renderer..." << std::endl;
-
   if (2 == argc) {
     model = new Model(argv[1]);
   } else {
     model = new Model("obj/african_head.obj");
   }
 
-  if (model->nverts() == 0) {
-    std::cout << "ERROR: Failed to load model!" << std::endl;
-    return 1;
-  }
+  // настройка матриц
+  // Матрица вида (ModelView) - определяет положение и ориентацию камеры
+  // eye - позиция камеры, center - точка на которую смотрим, Vec3f(0,1,0) -
+  // вектор "вверх"
+  lookat(eye, center, Vec3f(0, 1, 0));
 
-  std::cout << "Model loaded: " << model->nverts() << " vertices, "
-            << model->nfaces() << " faces" << std::endl;
+  // Матрица вьюпорта - преобразует из нормализованных координат в экранные
+  // Аргументы: начальная позиция (x,y) и размеры (width,height) области вывода
+  viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
 
-  zbuffer = new int[width * height];
-  for (int i = 0; i < width * height; i++) {
-    zbuffer[i] = std::numeric_limits<int>::min();
-  }
+  // Матрица проекции - применяет перспективное искажение
+  // Коэффициент -1/focal_length создает перспективный эффект
+  projection(-1.f / (eye - center).norm());
 
-  {  // draw the model
-    Vec3f eye(0, 0, 3);
-    Vec3f center(0, 0, 0);
-    Vec3f up(0, 1, 0);
+  TGAImage image(width, height, TGAImage::RGB);
 
-    Camera camera(eye, center, up);
-    Matrix View = camera.getViewMatrix();
-    Matrix Projection = Matrix::identity(4);
-    Projection[3][2] = -1.f / (eye - center).norm();
-    Matrix ViewPort =
-        viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
+  // Создание экземпляра шейдера
+  Shader shader;
 
-    TGAImage image(width, height, TGAImage::RGB);
+  // по сути главный цикел рендера
+  // идем по всем треугольникам
+  for (int i = 0; i < model->nfaces(); i++) {
+    std::vector<int> face = model->face(i);
 
-    std::cout << "Rendering..." << std::endl;
-    for (int i = 0; i < model->nfaces(); i++) {
-      std::vector<int> face = model->face(i);
-      Vec3i screen_coords[3];
-      float intensity[3];
+    Vec3i screen_coords[3];  // Координаты в экранном пространстве (после всех
+                             // преобразований)
+    Vec3f world_coords[3];   // Координаты в мировом пространстве (оригинальные)
 
-      for (int j = 0; j < 3; j++) {
-        Vec3f v = model->vert(face[j]);
-        screen_coords[j] = m2v(ViewPort * Projection * View * v2m(v));
+    // Обрабатываем три вершины треугольника
+    for (int j = 0; j < 3; j++) {
+      // Получаем мировые координаты j-й вершины треугольника
+      Vec3f v = model->vert(face[j]);
 
-        // ���������� ����� ����� norm �� ������
-        Vec3f n = model->norm(i, j);
-        intensity[j] = n * light_dir;
-        if (intensity[j] < 0) intensity[j] = 0;
-        if (intensity[j] > 1) intensity[j] = 1;
-      }
+      // Преобразуем вершину в экранные координаты:
+      // матричные преобразования:
+      // 1. ModelView - в пространство камеры
+      // 2. Projection - перспективное преобразование
+      // 3. Viewport - в экранные координаты
+      screen_coords[j] = Vec3f(Viewport * Projection * ModelView * Matrix(v));
 
-      // ���������� ���������� ��� ������ �������������
-      if (i < 5) {
-        std::cout << "Triangle " << i << " intensities: " << intensity[0]
-                  << ", " << intensity[1] << ", " << intensity[2] << std::endl;
-      }
+      // Сохраняем оригинальные мировые координаты
+      world_coords[j] = v;
 
-      triangle(screen_coords[0], screen_coords[1], screen_coords[2],
-               intensity[0], intensity[1], intensity[2], image, zbuffer);
+      // Интенсивность освещения для вершины
+      // model->norm(i, j) - нормаль вершины из модели
+      // Умножение на light_dir дает косинус угла между нормалью и светом
+      shader.varying_inty[j] = model->norm(i, j) * light_dir;
+
+      // Текстурные координаты для вершины
+      // model->uv(i, j) возвращает координаты текстуры для j-й вершины i-го
+      // полигона
+      shader.varying_uv[j] = model->uv(i, j);
     }
 
-    image.flip_vertically();
-    image.write_tga_file("output.tga");
-    std::cout << "Saved output.tga" << std::endl;
+    // вызываем растеризатор
+    // screen_coords - вершины треугольника в экранных координатах
+    // shader - шейдер для расчета цвета каждого пикселя
+    // image - целевое изображение для отрисовки
+    // zbuffer - буфер глубины для корректного отображения перекрывающихся
+    // объектов
+    triangle(screen_coords, shader, image, zbuffer);
   }
 
-  {  // dump z-buffer
-    TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
-    for (int i = 0; i < width; i++) {
-      for (int j = 0; j < height; j++) {
-        zbimage.set(i, j, TGAColor(zbuffer[i + j * width]));
-      }
-    }
-    zbimage.flip_vertically();
-    zbimage.write_tga_file("zbuffer.tga");
-    std::cout << "Saved zbuffer.tga" << std::endl;
-  }
-
+  image.flip_vertically();
+  image.write_tga_file("output.tga");
+  zbuffer.flip_vertically();
+  zbuffer.write_tga_file("zbuffer.tga");
   delete model;
-  delete[] zbuffer;
-  std::cout << "Done!" << std::endl;
   return 0;
 }
