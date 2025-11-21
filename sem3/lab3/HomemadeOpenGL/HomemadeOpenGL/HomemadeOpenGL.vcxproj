@@ -130,8 +130,10 @@
   <ItemGroup>
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="geometry.cpp" />
+    <ClCompile Include="gouraud_shader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="model.cpp" />
+    <ClCompile Include="phong_shader.cpp" />
     <ClCompile Include="rasterizer.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="tgaimage.cpp" />
@@ -139,7 +141,9 @@
   <ItemGroup>
     <ClInclude Include="camera.h" />
     <ClInclude Include="geometry.h" />
+    <ClInclude Include="gouraud_shader.h" />
     <ClInclude Include="model.h" />
+    <ClInclude Include="phong_shader.h" />
     <ClInclude Include="rasterizer.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="tgaimage.h" />
