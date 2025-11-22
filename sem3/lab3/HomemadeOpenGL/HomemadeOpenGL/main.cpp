@@ -54,7 +54,6 @@ int main(int argc, char** argv) {
   Vec3f light_dir(1, 1, 1);
   Vec3f view_dir = (camera.getEye() - camera.getCenter()).normalize();
 
-  // Создаем прозрачный объект
   TransparentObject iceCube;
   iceCube.createCube(Vec3f(0, 0.2f, 0.5f), 1.5f);
   iceCube.setColor(TGAColor(100, 200, 255, 128));
@@ -64,34 +63,17 @@ int main(int argc, char** argv) {
 
   // Показываем настройки рендеринга
   ui.showRenderSettings(current_shader, width, height);
-  std::cout << u8"   • Дополнительно: Ледяной эффект включен\n";
 
   // Общее количество полигонов для прогресс-бара
   int total_faces = model->nfaces() + iceCube.nfaces();
   ui.startRender(total_faces);
   auto start_time = std::chrono::high_resolution_clock::now();
 
-  for (int i = 0; i < iceCube.nfaces(); i++) {
-    std::vector<int> face = iceCube.face(i);
-    Vec3i screen_coords[3];
-
-    for (int j = 0; j < 3; j++) {
-      Vec3f world_coord = iceCube.vert(face[j]);
-      screen_coords[j] = Vec3f(camera.getViewport() * camera.getProjection() *
-                               camera.getModelView() * Matrix(world_coord));
-    }
-
-    rasterizer.triangle(screen_coords, iceShader, true);  // true = прозрачный
-    ui.updateProgress(i);
-  }
-
-  // Затем рендерим основную модель
-  std::cout << u8"\nРендеринг модели...\n";
   for (int i = 0; i < model->nfaces(); i++) {
     std::vector<int> face = model->face(i);
     Vec3i screen_coords[3];
 
-    ui.updateProgress(iceCube.nfaces() + i);
+    ui.updateProgress(i);
 
     switch (current_shader) {
       case DIFFUSE: {
@@ -142,12 +124,28 @@ int main(int argc, char** argv) {
     }
   }
 
+  for (int i = 0; i < iceCube.nfaces(); i++) {
+    std::vector<int> face = iceCube.face(i);
+    Vec3i screen_coords[3];
+
+    for (int j = 0; j < 3; j++) {
+      Vec3f world_coord = iceCube.vert(face[j]);
+      screen_coords[j] = Vec3f(camera.getViewport() * camera.getProjection() *
+                               camera.getModelView() * Matrix(world_coord));
+    }
+
+    rasterizer.triangle(screen_coords, iceShader, true);  // true = прозрачный
+    ui.updateProgress(model->nfaces() + i);
+  }
+
   auto end_time = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       end_time - start_time);
   ui.finishRender();
 
   std::cout << u8"\nСохранение результатов...";
+
+  // Сохранение результатов
   image.flip_vertically();
   image.write_tga_file("frozen_output.tga");
 
