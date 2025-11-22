@@ -13,6 +13,8 @@
 #include "renderer_ui.h"
 #include "shader.h"
 #include "tgaimage.h"
+#include "transparent_object.h"
+#include "transparent_shader.h"
 #define NOMINMAX
 #include "Windows.h"
 
@@ -44,7 +46,7 @@ int main(int argc, char** argv) {
   TGAImage zbuffer(width, height, TGAImage::GRAYSCALE);
 
   Camera camera;
-  camera.lookAt(Vec3f(-1.5, 1, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
+  camera.lookAt(Vec3f(1, 1, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
   camera.updateViewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
   camera.updateProjection(-1.0f / camera.getFocalLength());
 
@@ -52,12 +54,20 @@ int main(int argc, char** argv) {
   Vec3f light_dir(1, 1, 1);
   Vec3f view_dir = (camera.getEye() - camera.getCenter()).normalize();
 
+  TransparentObject iceCube;
+  iceCube.createCube(Vec3f(0.2f, 0.2f, 0.2f), 1.5f);
+  iceCube.setColor(TGAColor(80, 180, 255, 100));
+  iceCube.setAlpha(0.3f);
+
+  TransparentShader iceShader(iceCube.getColor(), iceCube.getAlpha());
   // Показываем настройки рендеринга
   ui.showRenderSettings(current_shader, width, height);
-  ui.startRender(model->nfaces());
+
+  // Общее количество полигонов для прогресс-бара
+  int total_faces = model->nfaces() + iceCube.nfaces();
+  ui.startRender(total_faces);
   auto start_time = std::chrono::high_resolution_clock::now();
 
-  // Главный цикл рендеринга
   for (int i = 0; i < model->nfaces(); i++) {
     std::vector<int> face = model->face(i);
     Vec3i screen_coords[3];
@@ -87,7 +97,7 @@ int main(int argc, char** argv) {
                     camera.getModelView() * Matrix(world_coord));
 
           Vec3f normal = model->norm(i, j);
-          float intensity = std::max(normal * light_dir, 0.0f);
+          float intensity = (std::max)(normal * light_dir, 0.0f);
 
           shader.setVaryingUV(j, model->uv(i, j));
           shader.setVaryingIntensity(j, intensity);
@@ -113,6 +123,20 @@ int main(int argc, char** argv) {
     }
   }
 
+  for (int i = 0; i < iceCube.nfaces(); i++) {
+    std::vector<int> face = iceCube.face(i);
+    Vec3i screen_coords[3];
+
+    for (int j = 0; j < 3; j++) {
+      Vec3f world_coord = iceCube.vert(face[j]);
+      screen_coords[j] = Vec3f(camera.getViewport() * camera.getProjection() *
+                               camera.getModelView() * Matrix(world_coord));
+    }
+
+    rasterizer.triangle(screen_coords, iceShader, true);  // true = прозрачный
+    ui.updateProgress(model->nfaces() + i);
+  }
+
   auto end_time = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       end_time - start_time);
@@ -122,10 +146,10 @@ int main(int argc, char** argv) {
 
   // Сохранение результатов
   image.flip_vertically();
-  image.write_tga_file("output.tga");
+  image.write_tga_file("frozen_output.tga");
 
   zbuffer.flip_vertically();
-  zbuffer.write_tga_file("zbuffer.tga");
+  zbuffer.write_tga_file("frozen_zbuffer.tga");
 
   ui.showStatistics(model, duration.count());
 

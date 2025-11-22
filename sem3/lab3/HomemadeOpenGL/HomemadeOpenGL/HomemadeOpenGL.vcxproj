@@ -138,6 +138,8 @@
     <ClCompile Include="renderer_ui.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="tgaimage.cpp" />
+    <ClCompile Include="transparent_object.cpp" />
+    <ClCompile Include="transparent_shader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.h" />
@@ -149,6 +151,8 @@
     <ClInclude Include="renderer_ui.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="tgaimage.h" />
+    <ClInclude Include="transparent_object.h" />
+    <ClInclude Include="transparent_shader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
