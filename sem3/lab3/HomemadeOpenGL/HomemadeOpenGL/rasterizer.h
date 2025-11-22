@@ -2,7 +2,6 @@
 #define __RASTERIZER_H__
 
 #include <algorithm>
-#include <iostream>
 #include <limits>
 
 #include "geometry.h"
@@ -18,7 +17,7 @@ class Rasterizer {
 
  public:
   Rasterizer(TGAImage& image, TGAImage& zbuffer);
-  void triangle(Vec3i* pts, IShader& shader);
+  void triangle(Vec3i* pts, IShader& shader, bool transparent = false);
 };
 
 #endif  // __RASTERIZER_H__
