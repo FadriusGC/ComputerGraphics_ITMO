@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
   TGAImage zbuffer(width, height, TGAImage::GRAYSCALE);
 
   Camera camera;
-  camera.lookAt(Vec3f(-1.5, 1, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
+  camera.lookAt(Vec3f(1, 1, 3), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
   camera.updateViewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
   camera.updateProjection(-1.0f / camera.getFocalLength());
 
@@ -55,12 +55,11 @@ int main(int argc, char** argv) {
   Vec3f view_dir = (camera.getEye() - camera.getCenter()).normalize();
 
   TransparentObject iceCube;
-  iceCube.createCube(Vec3f(0, 0.2f, 0.5f), 1.5f);
-  iceCube.setColor(TGAColor(100, 200, 255, 128));
-  iceCube.setAlpha(0.4f);
+  iceCube.createCube(Vec3f(0.2f, 0.2f, 0.2f), 1.5f);
+  iceCube.setColor(TGAColor(80, 180, 255, 100));
+  iceCube.setAlpha(0.3f);
 
   TransparentShader iceShader(iceCube.getColor(), iceCube.getAlpha());
-
   // Показываем настройки рендеринга
   ui.showRenderSettings(current_shader, width, height);
 

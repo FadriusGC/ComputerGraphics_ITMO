@@ -43,10 +43,22 @@ void Rasterizer::triangle(Vec3i* pts, IShader& shader, bool transparent) {
 
       if (!discard) {
         if (transparent) {
-          // Для прозрачных объектов рисуем поверх
-          image_.set(P.x, P.y, color);
+          TGAColor background = image_.get(P.x, P.y);
+          float alpha = color.bgra[3] / 255.0f;  // Альфа-канал из цвета
+
+          // Смешиваем цвета: result = foreground * alpha + background * (1 -
+          // alpha)
+          unsigned char r = static_cast<unsigned char>(
+              color.bgra[2] * alpha + background.bgra[2] * (1 - alpha));
+          unsigned char g = static_cast<unsigned char>(
+              color.bgra[1] * alpha + background.bgra[1] * (1 - alpha));
+          unsigned char b = static_cast<unsigned char>(
+              color.bgra[0] * alpha + background.bgra[0] * (1 - alpha));
+
+          TGAColor blended_color(r, g, b);
+          image_.set(P.x, P.y, blended_color);
         } else {
-          // Для непрозрачных проверяем з буффер
+          // Для непрозрачных объектов z буффер
           if (zbuffer_.get(P.x, P.y)[0] <= P.z) {
             zbuffer_.set(P.x, P.y, TGAColor(static_cast<unsigned char>(P.z)));
             image_.set(P.x, P.y, color);
